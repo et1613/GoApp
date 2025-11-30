@@ -40,31 +40,54 @@ func (h *AuthHandler) SendOTP(ctx context.Context, req *proto.SendOTPRequest) (*
 }
 
 func (h *AuthHandler) VerifyOTP(ctx context.Context, req *proto.VerifyOTPRequest) (*proto.VerifyOTPResponse, error) {
-	log.Printf("Received VerifyOTP request for phone number: %s", req.PhoneNumber)
+	log.Printf("Received VerifyOTP request for phone number: %s, device_id: %s", req.PhoneNumber, req.DeviceId)
 
-	accessToken, refreshToken, err := h.service.VerifyOTP(ctx, req.PhoneNumber, req.OtpCode)
+	user, accessToken, refreshToken, err := h.service.VerifyOTP(ctx, req.PhoneNumber, req.OtpCode, req.DeviceId)
 	if err != nil {
 		// Check for specific error types if needed, otherwise return a general internal error.
 		// The service layer already logs the details.
 		return nil, status.Errorf(codes.Internal, "failed to verify OTP: %v", err)
 	}
 
-	// The service layer now handles user creation/retrieval and token generation.
-	// We just need to return the tokens to the client.
-	log.Printf("VerifyOTP success for %s (access len=%d, refresh len=%d)", req.PhoneNumber, len(accessToken), len(refreshToken))
+	// Return user info along with tokens
+	log.Printf("VerifyOTP success for %s (user_id=%s, access len=%d, refresh len=%d)", req.PhoneNumber, user.ID, len(accessToken), len(refreshToken))
 	return &proto.VerifyOTPResponse{
+		User: &proto.User{
+			Id:                user.ID.String(),
+			PhoneNumber:       user.PhoneNumber,
+			DisplayName:       user.DisplayName,
+			ProfilePictureUrl: user.ProfilePictureURL,
+			AboutText:         user.AboutText,
+		},
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 	}, nil
 }
 
+// Helper to convert *string to string
+func stringPtrToString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
 func (h *AuthHandler) ValidateToken(ctx context.Context, req *proto.ValidateTokenRequest) (*proto.ValidateTokenResponse, error) {
+	log.Printf("ValidateToken called. Token length: %d, first 50 chars: %s", len(req.AccessToken), truncate(req.AccessToken, 50))
 	valid, userID := h.service.ValidateAccessToken(req.AccessToken)
+	log.Printf("ValidateToken result: valid=%v, user_id=%s (len=%d)", valid, userID, len(userID))
 	// Do not treat invalid token as an RPC error; return is_valid=false
 	return &proto.ValidateTokenResponse{
 		IsValid: valid,
 		UserId:  userID,
 	}, nil
+}
+
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
 
 func (h *AuthHandler) RefreshToken(ctx context.Context, req *proto.RefreshTokenRequest) (*proto.RefreshTokenResponse, error) {

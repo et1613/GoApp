@@ -66,3 +66,61 @@ func UnaryAuthInterceptor(tm *appjwt.TokenManager) grpc.UnaryServerInterceptor {
 		return handler(ctx, req)
 	}
 }
+
+// StreamAuthInterceptor returns a grpc.StreamServerInterceptor that validates
+// streaming connections using the provided TokenManager.
+func StreamAuthInterceptor(tm *appjwt.TokenManager) grpc.StreamServerInterceptor {
+	return func(srv interface{}, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		ctx := ss.Context()
+
+		// Exempt AuthService methods by default (if any streaming methods)
+		if strings.HasPrefix(info.FullMethod, "/auth.AuthService/") {
+			return handler(srv, ss)
+		}
+
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			return status.Error(codes.Unauthenticated, "missing metadata")
+		}
+
+		authHeaders := md.Get("authorization")
+		if len(authHeaders) == 0 {
+			return status.Error(codes.Unauthenticated, "missing authorization header")
+		}
+
+		auth := authHeaders[0]
+		if !strings.HasPrefix(strings.ToLower(auth), "bearer ") {
+			return status.Error(codes.Unauthenticated, "invalid authorization header")
+		}
+		token := strings.TrimSpace(auth[len("bearer "):])
+
+		claims, err := tm.ValidateToken(token)
+		if err != nil {
+			return status.Error(codes.Unauthenticated, "invalid or expired token")
+		}
+		if claims.Type != appjwt.TokenTypeAccess {
+			return status.Error(codes.Unauthenticated, "token must be an access token")
+		}
+
+		// Inject user ID into context
+		ctx = context.WithValue(ctx, userIDKey, claims.Subject)
+
+		// Wrap the stream with new context
+		wrappedStream := &wrappedServerStream{
+			ServerStream: ss,
+			ctx:          ctx,
+		}
+
+		return handler(srv, wrappedStream)
+	}
+}
+
+// wrappedServerStream wraps grpc.ServerStream with a custom context
+type wrappedServerStream struct {
+	grpc.ServerStream
+	ctx context.Context
+}
+
+func (w *wrappedServerStream) Context() context.Context {
+	return w.ctx
+}

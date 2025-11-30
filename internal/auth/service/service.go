@@ -23,16 +23,14 @@ type AuthService struct {
 	userRepo         repository.UserRepository
 	deviceRepo       repository.DeviceRepository
 	tokenManager     *jwt.TokenManager
+	devMode          bool
 }
 
 func NewAuthService(userRepo repository.UserRepository, deviceRepo repository.DeviceRepository) *AuthService {
 	accountSid := os.Getenv("TWILIO_ACCOUNT_SID")
 	authToken := os.Getenv("TWILIO_AUTH_TOKEN")
 	verifyServiceSID := os.Getenv("TWILIO_VERIFY_SERVICE_SID")
-
-	if accountSid == "" || authToken == "" || verifyServiceSID == "" {
-		log.Fatal("Twilio environment variables not set")
-	}
+	devMode := os.Getenv("AUTH_DEV_MODE") == "true" || os.Getenv("AUTH_DEV_MODE") == "1"
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
@@ -44,10 +42,18 @@ func NewAuthService(userRepo repository.UserRepository, deviceRepo repository.De
 		log.Fatalf("Failed to create token manager: %v", err)
 	}
 
-	client := twilio.NewRestClientWithParams(twilio.ClientParams{
-		Username: accountSid,
-		Password: authToken,
-	})
+	var client *twilio.RestClient
+	if !devMode {
+		if accountSid == "" || authToken == "" || verifyServiceSID == "" {
+			log.Fatal("Twilio environment variables not set (set AUTH_DEV_MODE=true to bypass in development)")
+		}
+		client = twilio.NewRestClientWithParams(twilio.ClientParams{
+			Username: accountSid,
+			Password: authToken,
+		})
+	} else {
+		log.Printf("[DEV MODE] Twilio OTP is bypassed. Use OTP code 123456 for verification.")
+	}
 
 	return &AuthService{
 		twilioClient:     client,
@@ -55,10 +61,15 @@ func NewAuthService(userRepo repository.UserRepository, deviceRepo repository.De
 		userRepo:         userRepo,
 		deviceRepo:       deviceRepo,
 		tokenManager:     tokenManager,
+		devMode:          devMode,
 	}
 }
 
 func (s *AuthService) SendOTP(phoneNumber string) (string, error) {
+	if s.devMode {
+		log.Printf("[DEV MODE] SendOTP bypassed for %s. Returning 'sent'.", phoneNumber)
+		return "sent", nil
+	}
 	params := &verify.CreateVerificationParams{}
 	params.SetTo(phoneNumber)
 	params.SetChannel("sms")
@@ -73,30 +84,37 @@ func (s *AuthService) SendOTP(phoneNumber string) (string, error) {
 	return *resp.Status, nil
 }
 
-func (s *AuthService) VerifyOTP(ctx context.Context, phoneNumber, code string) (string, string, error) {
-	// 1. Verify code with Twilio
-	checkParams := &verify.CreateVerificationCheckParams{}
-	checkParams.SetTo(phoneNumber)
-	checkParams.SetCode(code)
+func (s *AuthService) VerifyOTP(ctx context.Context, phoneNumber, code, deviceID string) (*domain.User, string, string, error) {
+	// 1. Verify code (Twilio or Dev)
+	if s.devMode {
+		if code != "123456" {
+			return nil, "", "", errors.New("invalid OTP code in dev mode; expected 123456")
+		}
+		log.Printf("[DEV MODE] OTP accepted for %s", phoneNumber)
+	} else {
+		checkParams := &verify.CreateVerificationCheckParams{}
+		checkParams.SetTo(phoneNumber)
+		checkParams.SetCode(code)
 
-	resp, err := s.twilioClient.VerifyV2.CreateVerificationCheck(s.verifyServiceSID, checkParams)
-	if err != nil {
-		log.Printf("Failed to verify OTP via Twilio: %v\n", err)
-		return "", "", err
+		resp, err := s.twilioClient.VerifyV2.CreateVerificationCheck(s.verifyServiceSID, checkParams)
+		if err != nil {
+			log.Printf("Failed to verify OTP via Twilio: %v\n", err)
+			return nil, "", "", err
+		}
+
+		if resp.Status == nil || *resp.Status != "approved" {
+			log.Printf("OTP verification failed for %s. Status: %s\n", phoneNumber, *resp.Status)
+			return nil, "", "", errors.New("OTP verification failed or code is incorrect")
+		}
+
+		log.Printf("OTP verification successful for %s\n", phoneNumber)
 	}
-
-	if resp.Status == nil || *resp.Status != "approved" {
-		log.Printf("OTP verification failed for %s. Status: %s\n", phoneNumber, *resp.Status)
-		return "", "", errors.New("OTP verification failed or code is incorrect")
-	}
-
-	log.Printf("OTP verification successful for %s\n", phoneNumber)
 
 	// 2. Check if user exists in the database
 	user, err := s.userRepo.FindByPhoneNumber(ctx, phoneNumber)
 	if err != nil {
 		log.Printf("Error finding user by phone number: %v", err)
-		return "", "", err
+		return nil, "", "", err
 	}
 
 	// 3. If user does not exist, create a new one
@@ -108,7 +126,7 @@ func (s *AuthService) VerifyOTP(ctx context.Context, phoneNumber, code string) (
 		user, err = s.userRepo.CreateUser(ctx, newUser)
 		if err != nil {
 			log.Printf("Error creating new user: %v", err)
-			return "", "", err
+			return nil, "", "", err
 		}
 		log.Printf("New user created with ID: %s", user.ID)
 	} else {
@@ -119,7 +137,7 @@ func (s *AuthService) VerifyOTP(ctx context.Context, phoneNumber, code string) (
 	accessToken, refreshToken, err := s.tokenManager.GenerateTokens(user.ID.String())
 	if err != nil {
 		log.Printf("Error generating tokens for user %s: %v", user.ID, err)
-		return "", "", err
+		return nil, "", "", err
 	}
 
 	// Debug: Validate and log token types to confirm mapping
@@ -137,22 +155,28 @@ func (s *AuthService) VerifyOTP(ctx context.Context, phoneNumber, code string) (
 	log.Printf("Generated tokens for user %s (access len=%d, refresh len=%d)", user.ID, len(accessToken), len(refreshToken))
 
 	// 5. Persist refresh token hash for revocation checks
-	// Minimal device info since we don't have device metadata here
+	// Use device_id from request for better tracking
 	if s.deviceRepo != nil {
 		hash := hashRefreshToken(refreshToken)
+		deviceName := deviceID
+		if deviceName == "" {
+			deviceName = "unknown"
+		}
 		dev := &domain.UserDevice{
 			UserID:           user.ID,
 			RefreshTokenHash: hash,
-			DeviceName:       "unknown",
-			DeviceType:       "unknown",
+			DeviceName:       deviceName,
+			DeviceType:       "mobile", // Could be enhanced with actual device type
 			LastLoginAt:      time.Now(),
 		}
 		if err := s.deviceRepo.UpsertDevice(ctx, dev); err != nil {
 			log.Printf("Warning: failed to upsert user device for user %s: %v", user.ID, err)
+		} else {
+			log.Printf("Device %s registered for user %s", deviceName, user.ID)
 		}
 	}
 
-	return accessToken, refreshToken, nil
+	return user, accessToken, refreshToken, nil
 }
 
 // RefreshToken validates a refresh token and issues a new pair of access and refresh tokens.

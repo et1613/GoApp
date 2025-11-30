@@ -214,6 +214,7 @@ type VerifyOTPRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PhoneNumber   string                 `protobuf:"bytes,1,opt,name=phone_number,json=phoneNumber,proto3" json:"phone_number,omitempty"`
 	OtpCode       string                 `protobuf:"bytes,2,opt,name=otp_code,json=otpCode,proto3" json:"otp_code,omitempty"`
+	DeviceId      string                 `protobuf:"bytes,3,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"` // Device identifier for multi-device support
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -258,6 +259,13 @@ func (x *VerifyOTPRequest) GetPhoneNumber() string {
 func (x *VerifyOTPRequest) GetOtpCode() string {
 	if x != nil {
 		return x.OtpCode
+	}
+	return ""
+}
+
+func (x *VerifyOTPRequest) GetDeviceId() string {
+	if x != nil {
+		return x.DeviceId
 	}
 	return ""
 }
@@ -670,10 +678,11 @@ const file_proto_auth_proto_rawDesc = "" +
 	"\x0eSendOTPRequest\x12!\n" +
 	"\fphone_number\x18\x01 \x01(\tR\vphoneNumber\"+\n" +
 	"\x0fSendOTPResponse\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage\"P\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\"m\n" +
 	"\x10VerifyOTPRequest\x12!\n" +
 	"\fphone_number\x18\x01 \x01(\tR\vphoneNumber\x12\x19\n" +
-	"\botp_code\x18\x02 \x01(\tR\aotpCode\"{\n" +
+	"\botp_code\x18\x02 \x01(\tR\aotpCode\x12\x1b\n" +
+	"\tdevice_id\x18\x03 \x01(\tR\bdeviceId\"{\n" +
 	"\x11VerifyOTPResponse\x12\x1e\n" +
 	"\x04user\x18\x01 \x01(\v2\n" +
 	".auth.UserR\x04user\x12!\n" +

@@ -45,6 +45,7 @@ message SendOTPResponse {
 message VerifyOTPRequest {
     string phone_number = 1;
     string otp_code = 2;
+    string device_id = 3;  // Device identifier for multi-device support
 }
 
 message VerifyOTPResponse {

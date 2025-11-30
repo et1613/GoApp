@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package proto;
+
+option go_package = "github.com/dykethecreator/GoApp/proto";
+
+// RealtimeService provides streaming connections for real-time messaging
+service RealtimeService {
+  // Connect establishes a bidirectional stream for receiving messages and events
+  rpc Connect(stream ClientEvent) returns (stream ServerEvent);
+}
+
+// ClientEvent represents events sent from client to server
+message ClientEvent {
+  oneof event {
+    Ping ping = 1;
+    TypingIndicator typing = 2;
+    ReadReceipt read_receipt = 3;
+  }
+}
+
+// ServerEvent represents events sent from server to client
+message ServerEvent {
+  oneof event {
+    Pong pong = 1;
+    NewMessage new_message = 2;
+    TypingIndicator typing = 3;
+    PresenceUpdate presence = 4;
+    MessageDelivered delivered = 5;
+  }
+}
+
+// Ping for keep-alive
+message Ping {
+  int64 timestamp = 1;
+}
+
+// Pong response
+message Pong {
+  int64 timestamp = 1;
+}
+
+// NewMessage pushed to client when a message arrives
+message NewMessage {
+  string message_id = 1;
+  string conversation_id = 2;
+  string sender_id = 3;
+  string content = 4;
+  string media_url = 5;
+  string media_type = 6;
+  string created_at = 7;
+}
+
+// TypingIndicator shows when someone is typing
+message TypingIndicator {
+  string conversation_id = 1;
+  string user_id = 2;
+  bool is_typing = 3;
+}
+
+// PresenceUpdate shows online/offline status
+message PresenceUpdate {
+  string user_id = 1;
+  string status = 2; // "online", "offline", "away"
+  string last_seen = 3;
+}
+
+// MessageDelivered confirms message delivery
+message MessageDelivered {
+  string message_id = 1;
+  string conversation_id = 2;
+}
+
+// ReadReceipt sent by client when they read messages
+message ReadReceipt {
+  string conversation_id = 1;
+  string message_id = 2;
+}

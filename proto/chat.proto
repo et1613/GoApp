@@ -2,32 +2,64 @@ syntax = "proto3";
 
 package chat;
 
-option go_package = "github.com/your-username/goWhatsapp/proto/chat";
+option go_package = "github.com/dykethecreator/GoApp/proto";
+
+message Conversation {
+    string id = 1;
+    repeated string participant_ids = 2;
+    string created_at = 3;
+    bool is_group = 4;  // Whether this is a group conversation
+    string group_name = 5;  // Optional group name
+}
+
+message Message {
+    string id = 1;
+    string conversation_id = 2;
+    string sender_id = 3;
+    string content = 4;
+    string media_url = 5;
+    string media_type = 6;
+    string client_message_id = 7;
+    string created_at = 8;
+}
 
 service ChatService {
-    rpc GetChats(GetChatsRequest) returns (GetChatsResponse);
-    rpc CreateChat(CreateChatRequest) returns (CreateChatResponse);
+    rpc CreateConversation(CreateConversationRequest) returns (CreateConversationResponse);
+    rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+    rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse);
+    rpc GetConversations(GetConversationsRequest) returns (GetConversationsResponse);
 }
 
-message GetChatsRequest {
-    string user_id = 1;
+message CreateConversationRequest {
+    repeated string participant_ids = 1; // include caller
+    bool is_group = 2;  // Whether to create a group conversation
+    string group_name = 3;  // Optional group name for group conversations
+}
+message CreateConversationResponse {
+    Conversation conversation = 1;
 }
 
-message GetChatsResponse {
-    repeated Chat chats = 1;
+message SendMessageRequest {
+    string conversation_id = 1;
+    string content = 2;
+    string media_url = 3;
+    string media_type = 4;
+    string client_message_id = 5;
+}
+message SendMessageResponse {
+    Message message = 1;
 }
 
-message Chat {
-    string id = 1;
-    string name = 2;
-    string last_message = 3;
+message ListMessagesRequest {
+    string conversation_id = 1;
+    string before_message_id = 2; // optional
+    int32 limit = 3; // default 50
+}
+message ListMessagesResponse {
+    repeated Message messages = 1;
 }
 
-message CreateChatRequest {
-    string name = 1;
-    repeated string member_ids = 2;
-}
-
-message CreateChatResponse {
-    Chat chat = 1;
+message GetConversationsRequest {}
+message GetConversationsResponse {
+    repeated Conversation conversations = 1;
 }

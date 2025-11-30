@@ -1,0 +1,13 @@
+2025/11/30 16:52:20 🚀 Starting All-In-One Service (Auth + Chat + Realtime)
+2025/11/30 16:52:20 ✅ Realtime Hub started
+2025/11/30 16:52:20 [DEV MODE] Twilio OTP is bypassed. Use OTP code 123456 for verification.
+2025/11/30 16:53:26 [Realtime] User d94bb2ae-1852-48f9-adfc-2c2d81f78199 connecting...
+2025/11/30 16:53:26 [Hub] User d94bb2ae-1852-48f9-adfc-2c2d81f78199 connected (total: 1)
+[Chat] 📡 Broadcasting message to hub...
+[Chat] 📨 Broadcasting to 2 participants
+2025/11/30 16:53:30 [Hub] Broadcasting message 9c3c4e63 to conversation df396d61 (2 participants)
+2025/11/30 16:53:30 [Hub] ✅ Sent to client d94bb2ae
+2025/11/30 16:53:30 [Hub] ⚠️  Client f8b0744a not connected
+2025/11/30 16:53:30 [Hub] Message sent to 1/2 connected clients
+2025/11/30 16:54:26 [Realtime] User d94bb2ae-1852-48f9-adfc-2c2d81f78199 receive error: rpc error: code = Canceled desc = context canceled
+2025/11/30 16:54:26 [Hub] User d94bb2ae-1852-48f9-adfc-2c2d81f78199 disconnected (total: 0)

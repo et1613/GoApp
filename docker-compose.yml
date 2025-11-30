@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:13-alpine
@@ -8,7 +6,7 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: whatsapp_clone_dev
     ports:
-      - "5432:5432"
+      - "5433:5432"  # Expose Docker Postgres on 5433 to avoid conflict with local Postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:

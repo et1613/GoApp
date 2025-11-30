@@ -55,3 +55,24 @@ type ChatMember struct {
 	UnreadCount      int              `json:"unread_count" db:"unread_count"`
 	JoinedAt         time.Time        `json:"joined_at" db:"joined_at"`
 }
+
+// Conversation is a minimal alias to Chat for simple messaging threads.
+type Conversation struct {
+	ID             uuid.UUID   `json:"id" db:"id"`
+	ParticipantIDs []uuid.UUID `json:"participant_ids"`
+	IsGroup        bool        `json:"is_group" db:"is_group"`
+	GroupName      *string     `json:"group_name,omitempty" db:"group_name"`
+	CreatedAt      time.Time   `json:"created_at" db:"created_at"`
+}
+
+// Message represents a chat message stored in messages table.
+type ChatMessage struct {
+	ID              uuid.UUID `json:"id" db:"id"`
+	ConversationID  uuid.UUID `json:"conversation_id" db:"conversation_id"`
+	SenderID        uuid.UUID `json:"sender_id" db:"sender_id"`
+	Content         string    `json:"content" db:"content"`
+	MediaURL        *string   `json:"media_url,omitempty" db:"media_url"`
+	MediaType       *string   `json:"media_type,omitempty" db:"media_type"`
+	ClientMessageID *string   `json:"client_message_id,omitempty" db:"client_message_id"`
+	CreatedAt       time.Time `json:"created_at" db:"created_at"`
+}
