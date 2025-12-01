@@ -15,7 +15,7 @@ import (
 )
 
 func main() {
-	// Hard-coded test values - sadece bunları değiştir!
+	// Hard-coded test values - only change these!
 	accessToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0eXBlIjoiYWNjZXNzIiwiaXNzIjoibXktYXV0aC1zZXJ2aWNlIiwic3ViIjoiZDk0YmIyYWUtMTg1Mi00OGY5LWFkZmMtMmMyZDgxZjc4MTk5IiwiYXVkIjpbIm15LWFwcC1jbGllbnQiXSwiZXhwIjoxNzY0NTEwOTQzLCJpYXQiOjE3NjQ1MTAwNDMsImp0aSI6ImJmYWE0ODg1LTRlNGItNGM2OS05ODYwLTczNjA0YjM4YWVkNyJ9.yziT0zxRzdMFI3Nrtuvf1LXM_2uakYkDqGJDRvyRq1s"
 	conversationID := "df396d61-6059-4545-b317-acd1f51a99cd"
 
@@ -77,7 +77,7 @@ func main() {
 
 	// Wait for messages
 	fmt.Println("⏳ Listening for 60 seconds...")
-	fmt.Println("   (Şimdi Postman'den SendMessage yap!)")
+	fmt.Println("   (Now send SendMessage from Postman!)")
 	fmt.Println("═══════════════════════════════════════════")
 	fmt.Println()
 

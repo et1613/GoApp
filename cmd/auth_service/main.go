@@ -37,7 +37,7 @@ func main() {
 	// Then load base .env optionally to allow local overrides
 	_ = godotenv.Load()
 
-	// Veritabanı bağlantısını kur
+	// Establish database connection
 	db, err := database.NewDB(os.Getenv("DATABASE_URL"))
 	if err != nil {
 		log.Fatalf("failed to connect to database: %v", err)
@@ -71,13 +71,13 @@ func main() {
 		grpc.UnaryInterceptor(middleware.UnaryAuthInterceptor(tm)),
 	)
 
-	// Bağımlılıkları oluştur (DI - Dependency Injection)
+	// Create dependencies (DI - Dependency Injection)
 	userStore := store.NewUserStore(db.DB)
 	deviceStore := store.NewUserDeviceStore(db.DB)
 	authService := service.NewAuthService(userStore, deviceStore)
 	authHandler := handler.NewAuthHandler(authService)
 
-	// Handler'ı gRPC sunucusuna kaydet
+	// Register handler with gRPC server
 	authHandler.Register(s)
 
 	log.Printf("auth_service listening on %s (env=%s)", listenAddr, os.Getenv("APP_ENV"))

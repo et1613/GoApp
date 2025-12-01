@@ -6,21 +6,21 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid" // <-- YENİ: jti (JWT ID) için eklendi
+	"github.com/google/uuid" // <-- NEW: Added for jti (JWT ID)
 )
 
-// ErrInvalidToken, token doğrulama hataları için standart bir hata.
-var ErrInvalidToken = errors.New("geçersiz veya süresi dolmuş token")
+// ErrInvalidToken is a standard error for token validation failures.
+var ErrInvalidToken = errors.New("invalid or expired token")
 
-// TokenManager, JWT oluşturma ve doğrulama işlemlerini yönetir.
+// TokenManager manages JWT creation and validation operations.
 type TokenManager struct {
 	secretKey            []byte
 	accessTokenDuration  time.Duration
 	refreshTokenDuration time.Duration
 }
 
-// --- YENİ: Token Tipi Sabitleri ---
-// "access", "refresh" gibi sihirli dizgeleri (magic strings) önler.
+// --- NEW: Token Type Constants ---
+// Prevents magic strings like "access", "refresh".
 type TokenType string
 
 const (
@@ -28,24 +28,24 @@ const (
 	TokenTypeRefresh TokenType = "refresh"
 )
 
-// --- GÜNCELLENDİ: CustomClaims ---
-// UserID artık 'sub' (Subject) standardı içinde taşınacak.
+// --- UPDATED: CustomClaims ---
+// UserID is now carried within the 'sub' (Subject) standard.
 type CustomClaims struct {
-	Type TokenType `json:"type"` // 'access' veya 'refresh'
+	Type TokenType `json:"type"` // 'access' or 'refresh'
 	jwt.RegisteredClaims
 }
 
-// --- GÜNCELLENDİ: NewTokenManager ---
-// Yeni bir TokenManager örneği oluşturur.
+// --- UPDATED: NewTokenManager ---
+// Creates a new TokenManager instance.
 func NewTokenManager(secret string, accessDuration, refreshDuration time.Duration) (*TokenManager, error) {
-	// HS256 (SHA-256), 256 bitlik (32 byte) bir anahtar bekler.
-	// Güvenlik için minimum bir uzunluk zorlaması ekliyoruz.
+	// HS256 (SHA-256) expects a 256-bit (32 byte) key.
+	// Enforcing minimum length for security.
 	if len(secret) < 32 {
-		return nil, errors.New("JWT secret key, güvenlik için en az 32 byte olmalıdır")
+		return nil, errors.New("JWT secret key must be at least 32 bytes for security")
 	}
 
 	if accessDuration <= 0 || refreshDuration <= 0 {
-		return nil, errors.New("token süreleri pozitif bir değer olmalıdır")
+		return nil, errors.New("token durations must be positive values")
 	}
 
 	return &TokenManager{
@@ -61,9 +61,9 @@ func (tm *TokenManager) generateToken(claims CustomClaims) (string, error) {
 	return token.SignedString(tm.secretKey)
 }
 
-// --- GÜNCELLENDİ: GenerateTokens ---
-// Bir kullanıcı ID'si için standart claim'leri (sub, jti, iat vb.) içeren
-// yeni bir access ve refresh token çifti oluşturur.
+// --- UPDATED: GenerateTokens ---
+// Generates a new access and refresh token pair for a user ID
+// containing standard claims (sub, jti, iat, etc.).
 func (tm *TokenManager) GenerateTokens(userID string) (string, string, error) {
 	now := time.Now()
 
@@ -71,22 +71,22 @@ func (tm *TokenManager) GenerateTokens(userID string) (string, string, error) {
 	accessClaims := CustomClaims{
 		Type: TokenTypeAccess,
 		RegisteredClaims: jwt.RegisteredClaims{
-			// 'sub' (Subject) standardını UserID için kullanıyoruz
+			// Using 'sub' (Subject) standard for UserID
 			Subject: userID,
-			// 'jti' (JWT ID) token'ı benzersiz kılar, iptal (revocation) için kullanılır
+			// 'jti' (JWT ID) makes the token unique, used for revocation
 			ID: uuid.NewString(),
-			// 'iss' (Issuer) token'ı kimin oluşturduğu
+			// 'iss' (Issuer) who created the token
 			Issuer: "my-auth-service",
-			// 'aud' (Audience) token'ın kimin/hangi servis için olduğu
+			// 'aud' (Audience) who/which service the token is for
 			Audience: jwt.ClaimStrings{"my-app-client"},
-			// 'iat' (Issued At) ne zaman oluşturulduğu
+			// 'iat' (Issued At) when it was created
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(tm.accessTokenDuration)),
 		},
 	}
 	accessTokenString, err := tm.generateToken(accessClaims)
 	if err != nil {
-		return "", "", fmt.Errorf("access token imzalanamadı: %w", err)
+		return "", "", fmt.Errorf("failed to sign access token: %w", err)
 	}
 
 	// Refresh Token Claims
@@ -94,9 +94,9 @@ func (tm *TokenManager) GenerateTokens(userID string) (string, string, error) {
 		Type: TokenTypeRefresh,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject: userID,
-			ID:      uuid.NewString(), // Refresh token için de benzersiz ID
+			ID:      uuid.NewString(), // Unique ID for refresh token as well
 			Issuer:  "my-auth-service",
-			// Refresh token'ın hedef kitlesi *sadece* auth servisidir
+			// Refresh token's audience is *only* the auth service
 			Audience:  jwt.ClaimStrings{"my-auth-service"},
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(tm.refreshTokenDuration)),
@@ -104,45 +104,44 @@ func (tm *TokenManager) GenerateTokens(userID string) (string, string, error) {
 	}
 	refreshTokenString, err := tm.generateToken(refreshClaims)
 	if err != nil {
-		return "", "", fmt.Errorf("refresh token imzalanamadı: %w", err)
+		return "", "", fmt.Errorf("failed to sign refresh token: %w", err)
 	}
 
 	return accessTokenString, refreshTokenString, nil
 }
 
-// --- GÜNCELLENDİ: ValidateToken ---
-// Bir token string'ini doğrular ve içindeki claims'i döndürür.
-// Hata yönetimini daha spesifik hale getirir.
+// --- UPDATED: ValidateToken ---
+// Validates a token string and returns its claims.
+// Makes error handling more specific.
 func (tm *TokenManager) ValidateToken(tokenString string) (*CustomClaims, error) {
 
-	// Token'ı CustomClaims yapımıza göre ayrıştırıyoruz.
+	// Parse the token according to our CustomClaims structure
 	token, err := jwt.ParseWithClaims(tokenString, &CustomClaims{}, func(token *jwt.Token) (interface{}, error) {
-		// İmzalama yöntemini (alg) doğruluyoruz
+		// Verify the signing method (alg)
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("beklenmedik imzalama algoritması: %v", token.Header["alg"])
+			return nil, fmt.Errorf("unexpected signing algorithm: %v", token.Header["alg"])
 		}
-		// Gizli anahtarımızı döndürüyoruz
+		// Return our secret key
 		return tm.secretKey, nil
 	})
 
-	// Hata Kontrolü:
-	// Hata Kontrolü:
+	// Error Handling:
 	if err != nil {
-		// Hatanın süresinin dolmasından mı kaynaklandığını kontrol et
+		// Check if the error is due to expiration
 		if errors.Is(err, jwt.ErrTokenExpired) {
-			return nil, ErrInvalidToken // Süresi dolmuş
+			return nil, ErrInvalidToken // Expired
 		}
 
 		if errors.Is(err, jwt.ErrTokenSignatureInvalid) {
-			return nil, ErrInvalidToken // İmza geçersiz
+			return nil, ErrInvalidToken // Invalid signature
 		}
 
-		// Diğer tüm JWT ile ilgili hatalar için (örn: format bozuk, henüz geçerli değil vb.)
-		// yine standart hatamızı dönelim. İstemciye detay vermemek en güvenlisidir.
+		// For all other JWT-related errors (e.g., malformed format, not yet valid, etc.)
+		// return our standard error. Not revealing details to the client is most secure.
 		return nil, ErrInvalidToken
 	}
 
-	// Token'ı ve claims'i al
+	// Get the token and claims
 	if claims, ok := token.Claims.(*CustomClaims); ok && token.Valid {
 		return claims, nil
 	}

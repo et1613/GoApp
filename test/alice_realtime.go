@@ -30,7 +30,7 @@ func main() {
 	fmt.Printf("🚀 Starting Realtime Client for %s\n", userName)
 	fmt.Printf("📡 Connecting to localhost:50050...\n")
 
-	// gRPC bağlantısı
+	// gRPC connection
 	conn, err := grpc.Dial("localhost:50050", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("❌ Failed to connect: %v", err)
@@ -39,10 +39,10 @@ func main() {
 
 	client := pb.NewRealtimeServiceClient(conn)
 
-	// Metadata ile token gönder
+	// Send token via metadata
 	ctx := metadata.AppendToOutgoingContext(context.Background(), "authorization", "Bearer "+accessToken)
 
-	// Bidirectional stream aç
+	// Open bidirectional stream
 	stream, err := client.Connect(ctx)
 	if err != nil {
 		log.Fatalf("❌ Failed to connect stream: %v", err)
@@ -51,7 +51,7 @@ func main() {
 	fmt.Printf("✅ Connected to Realtime Service as %s\n", userName)
 	fmt.Println("─────────────────────────────────────────")
 
-	// Gelen mesajları dinle (goroutine)
+	// Listen for incoming messages (goroutine)
 	go func() {
 		for {
 			event, err := stream.Recv()
@@ -64,7 +64,7 @@ func main() {
 				return
 			}
 
-			// Event tipine göre işle
+			// Process based on event type
 			timestamp := time.Now().Format("15:04:05")
 			switch e := event.Event.(type) {
 			case *pb.ServerEvent_Pong:
@@ -87,7 +87,7 @@ func main() {
 		}
 	}()
 
-	// İlk ping gönder
+	// Send initial ping
 	err = stream.Send(&pb.ClientEvent{
 		Event: &pb.ClientEvent_Ping{Ping: &pb.Ping{Timestamp: time.Now().Unix()}},
 	})
@@ -95,7 +95,7 @@ func main() {
 		log.Fatalf("❌ Failed to send ping: %v", err)
 	}
 
-	// Heartbeat (30 saniyede bir ping)
+	// Heartbeat (ping every 30 seconds)
 	go func() {
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
@@ -110,7 +110,7 @@ func main() {
 		}
 	}()
 
-	// Komut dinle (typing indicator için)
+	// Listen for commands (for typing indicator)
 	fmt.Println("\n💡 Commands:")
 	fmt.Println("   't' + ENTER = Send typing indicator")
 	fmt.Println("   's' + ENTER = Stop typing indicator")
