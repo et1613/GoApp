@@ -55,7 +55,7 @@ func NewTokenManager(secret string, accessDuration, refreshDuration time.Duratio
 	}, nil
 }
 
-// generateToken, verilen claim'ler ile yeni bir token imzalar.
+// generateToken signs a new token with the given claims.
 func (tm *TokenManager) generateToken(claims CustomClaims) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(tm.secretKey)
